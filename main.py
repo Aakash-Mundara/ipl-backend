@@ -41,11 +41,31 @@ df = deliveries.merge(matches, left_on="match_id", right_on="id")
 all_players = deliveries["batter"].unique().tolist()
 def get_best_matching_player(user_input):
 
+    user_input = user_input.lower().strip()
+
+    # 1. Exact match
+    for player in all_players:
+        if user_input == player.lower():
+            return player
+
+    # 2. Last-name match
+    for player in all_players:
+
+        parts = player.lower().split()
+
+        if len(parts) > 1:
+
+            last_name = parts[-1]
+
+            if last_name in user_input:
+                return player
+
+    # 3. Fallback fuzzy match
     matches = get_close_matches(
         user_input,
         all_players,
         n=1,
-        cutoff=0.3
+        cutoff=0.2
     )
 
     if matches:
