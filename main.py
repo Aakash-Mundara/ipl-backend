@@ -4,7 +4,20 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from difflib import get_close_matches
+
 app = FastAPI()
+
+# 👇 ADD THIS HERE
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ✅ CORS
 app.add_middleware(
@@ -24,6 +37,21 @@ matches = pd.read_csv("matches.csv")
 
 # Merge datasets
 df = deliveries.merge(matches, left_on="match_id", right_on="id")
+
+all_players = deliveries["batter"].unique().tolist()
+def get_best_matching_player(user_input):
+
+    matches = get_close_matches(
+        user_input,
+        all_players,
+        n=1,
+        cutoff=0.3
+    )
+
+    if matches:
+        return matches[0]
+
+    return user_input
 
 # Convert date
 df["date"] = pd.to_datetime(df["date"])
@@ -126,7 +154,7 @@ def home():
 @app.post("/predict")
 def predict(data: dict):
     try:
-        player = data["player"]
+        player = get_best_matching_player(data["player"])
         team = data["team"]
         opponent = data["opponent"]
         venue = data["venue"]
