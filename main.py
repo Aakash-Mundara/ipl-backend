@@ -43,33 +43,35 @@ def get_best_matching_player(user_input):
 
     user_input = user_input.lower().strip()
 
-    # 1. Exact match
+    # Exact match
     for player in all_players:
         if user_input == player.lower():
             return player
 
-    # 2. Last-name match
+    # Match by surname
+    input_parts = user_input.split()
+
     for player in all_players:
 
-        parts = player.lower().split()
+        player_parts = player.lower().split()
 
-        if len(parts) > 1:
+        # Example:
+        # Virat Kohli -> kohli
+        # V Kohli -> kohli
 
-            last_name = parts[-1]
+        if len(input_parts) > 0 and len(player_parts) > 1:
 
-            if last_name in user_input:
+            input_last = input_parts[-1]
+            player_last = player_parts[-1]
+
+            if input_last == player_last:
                 return player
 
-    # 3. Fallback fuzzy match
-    matches = get_close_matches(
-        user_input,
-        all_players,
-        n=1,
-        cutoff=0.2
-    )
+    # Partial contains match
+    for player in all_players:
 
-    if matches:
-        return matches[0]
+        if user_input in player.lower():
+            return player
 
     return user_input
 
@@ -79,11 +81,39 @@ df["date"] = pd.to_datetime(df["date"])
 
 # ---------------- FEATURE FUNCTION ----------------
 def generate_features(player_name, team, opponent, venue, mean_runs_input, boundary_pct_input, strike_rate_input):
-    player_df = df[df["batter"] == player_name]
+    # Smart player matching directly from dataset
 
-    # If player not found
-    if player_df.empty:
-        raise ValueError(f"No data found for player: {player_name}")
+    matched_players = df[
+        df["batter"].str.lower().str.contains(
+        player_name.lower(),
+        na=False
+    )
+    ]["batter"].unique()
+
+    if len(matched_players) == 0:
+
+    # Try surname match
+       input_parts = player_name.lower().split()
+
+       if len(input_parts) > 0:
+
+        surname = input_parts[-1]
+
+        matched_players = df[
+            df["batter"].str.lower().str.contains(
+                surname,
+                na=False
+            )
+        ]["batter"].unique()
+
+    if len(matched_players) == 0:
+       raise ValueError(f"No data found for player: {player_name}")
+# Use first matched player
+    player_name = matched_players[0]
+
+    print("Final matched player:", player_name)
+
+    player_df = df[df["batter"] == player_name]
 
     # Aggregate runs per match
     player_match = (
@@ -174,7 +204,7 @@ def home():
 @app.post("/predict")
 def predict(data: dict):
     try:
-        player = get_best_matching_player(data["player"])
+        player = "V Kohli"
         team = data["team"]
         opponent = data["opponent"]
         venue = data["venue"]
@@ -182,6 +212,8 @@ def predict(data: dict):
         mean_runs_input = data["mean_runs"]
         boundary_pct_input = data["boundary_pct"]
         strike_rate_input = data["strike_rate"]
+        print("Original Input:", data["player"])
+        print("Matched Player:", player)
 
         feature_list = generate_features(
             player,
