@@ -41,37 +41,47 @@ df = deliveries.merge(matches, left_on="match_id", right_on="id")
 all_players = deliveries["batter"].unique().tolist()
 def get_best_matching_player(user_input):
 
-    user_input = user_input.lower().strip()
+    user_input = user_input.strip().lower()
 
-    # Exact match
-    for player in all_players:
-        if user_input == player.lower():
-            return player
-
-    # Match by surname
-    input_parts = user_input.split()
+    # exact surname / partial match first
+    partial_matches = []
 
     for player in all_players:
 
-        player_parts = player.lower().split()
+        player_lower = player.lower()
 
-        # Example:
-        # Virat Kohli -> kohli
-        # V Kohli -> kohli
+        if user_input in player_lower:
+            partial_matches.append(player)
 
-        if len(input_parts) > 0 and len(player_parts) > 1:
+    if partial_matches:
 
-            input_last = input_parts[-1]
-            player_last = player_parts[-1]
+        # Prefer shortest relevant match
+        best_match = sorted(partial_matches, key=len)[0]
 
-            if input_last == player_last:
-                return player
+        print("Original Input:", user_input)
+        print("Matched Player:", best_match)
 
-    # Partial contains match
-    for player in all_players:
+        return best_match
 
-        if user_input in player.lower():
-            return player
+    # fallback fuzzy match
+    matches = get_close_matches(
+        user_input,
+        [p.lower() for p in all_players],
+        n=1,
+        cutoff=0.4
+    )
+
+    if matches:
+
+        matched_name = next(
+            p for p in all_players
+            if p.lower() == matches[0]
+        )
+
+        print("Original Input:", user_input)
+        print("Matched Player:", matched_name)
+
+        return matched_name
 
     return user_input
 
@@ -204,7 +214,7 @@ def home():
 @app.post("/predict")
 def predict(data: dict):
     try:
-        player = "V Kohli"
+        player = get_best_matching_player(data["player"])
         team = data["team"]
         opponent = data["opponent"]
         venue = data["venue"]
@@ -212,8 +222,6 @@ def predict(data: dict):
         mean_runs_input = data["mean_runs"]
         boundary_pct_input = data["boundary_pct"]
         strike_rate_input = data["strike_rate"]
-        print("Original Input:", data["player"])
-        print("Matched Player:", player)
 
         feature_list = generate_features(
             player,
